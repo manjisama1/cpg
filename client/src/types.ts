@@ -1,4 +1,5 @@
 export type Role = 'officer' | 'police' | 'daket' | 'chor';
+export type Order = 'chor' | 'daket'; // what the Officer tells the Police to find
 export type Phase = 'officer_call' | 'police_confirm' | 'discussion' | 'investigation' | 'fallback' | 'result';
 
 export interface PublicPlayer {
@@ -27,6 +28,7 @@ export interface RoundResult {
   deltas: Record<string, number>;
   outcome: 'police_correct' | 'police_wrong' | 'police_timeout';
   target: string | null;
+  order: Order; // what the Officer ordered the Police to find
   fallback: 'correct' | 'wrong' | 'missed' | null;
   roles: Record<string, Role>; // only present once the round is over
 }
@@ -34,6 +36,9 @@ export interface RoundPublic {
   phase: Phase;
   deadline: number | null;
   verified: Record<string, Role>; // playerId -> role, only for players who raised a verified hand
+  order: Order | null; // set once the Officer raises a hand, public from then on
+  skipVotes: string[]; // ids of players who voted to skip the discussion
+  skipNeeded: number; // votes required to skip
   result: RoundResult | null;
 }
 export interface HistoryEntry extends RoundResult { round: number }
