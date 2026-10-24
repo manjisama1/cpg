@@ -48,7 +48,7 @@ export default function App() {
       )}
       {screen}
       <Toast />
-      <HelpButton />
+      {!g.state && <HelpButton />}
       <ConfirmHost />
     </div>
   );

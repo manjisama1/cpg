@@ -9,7 +9,7 @@ const POINTS: { role: string; right: string; wrong: string }[] = [
   { role: 'Chor', right: '-10', wrong: '+10' },
 ];
 
-/** The "?" button in the bottom corner, plus the help window it opens. */
+/** Help is available from the home screen, clear of the in-room chat and controls. */
 export function HelpButton() {
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);

@@ -6,6 +6,7 @@ import { useRemaining } from '../hooks';
 import { sfx } from '../sound';
 import { Chat } from '../components/Chat';
 import { PlayerCard } from '../components/PlayerCard';
+import { Avatar } from '../components/Avatar';
 import { PrefsBar } from '../components/PrefsBar';
 import { RoleBadge, ROLE_INFO } from '../components/RoleArt';
 import { RoleReveal } from '../components/RoleReveal';
@@ -116,6 +117,7 @@ function Round() {
   const chatOpen = phase === 'discussion' || phase === 'result';
   const iAmOfficer = myRole === 'officer';
   const iAmPolice = myRole === 'police';
+  const myCharacter = s.players.find((p) => p.id === g.myId)?.character ?? 0;
   const choosing = (phase === 'investigation' && iAmPolice) || (phase === 'fallback' && iAmOfficer);
 
   const officerId = Object.keys(verified).find((id) => verified[id] === 'officer');
@@ -153,6 +155,16 @@ function Round() {
 
         <div className="sr-only" role="status" aria-live="assertive">
           {PHASE_LABEL[phase]}.{officerId ? ` ${nameOf(officerId)} is the verified Officer.` : ''}{policeId ? ` ${nameOf(policeId)} is the verified Police.` : ''}
+        </div>
+
+        <div className="reaction-tray" aria-label="Send a character reaction">
+          <span>React</span>
+          {g.reactions.filter((r) => s.players.some((p) => p.id === r.playerId)).map((reaction) => (
+            <span key={reaction.id} className="reaction-pop" title={`${reaction.name} reacted`}><Avatar character={reaction.character} size={44} /></span>
+          ))}
+          <button className="reaction-button" onClick={() => void g.call('reaction:send')} aria-label="React with your character" title="React with your character">
+            <Avatar character={myCharacter} size={40} />
+          </button>
         </div>
 
         <ul className="pgrid" aria-label="Players">

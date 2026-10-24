@@ -2,7 +2,7 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode,
 } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import type { ChatMsg, PrivateInfo, PublicState } from './types';
+import type { ChatMsg, CharacterReaction, PrivateInfo, PublicState } from './types';
 
 export type Ack = { ok: boolean; error?: { code: string; message: string }; [k: string]: any };
 export interface Notice { id: number; text: string; tone: 'error' | 'info' }
@@ -22,13 +22,14 @@ interface GameApi {
   state: PublicState | null;
   priv: PrivateInfo | null;
   chat: ChatMsg[];
+  reactions: CharacterReaction[];
   myId: string | null;
   notice: Notice | null;
   dismissNotice: () => void;
   notify: (text: string, tone?: 'error' | 'info') => void;
   /** Pass { silent: true } when the caller shows the error itself instead of a toast. */
   call: (event: string, payload?: object, opts?: { silent?: boolean }) => Promise<Ack>;
-  createRoom: (name: string, character: number) => Promise<Ack>;
+  createRoom: (name: string, character: number, isPublic?: boolean) => Promise<Ack>;
   joinRoom: (code: string, name: string, character: number) => Promise<Ack>;
   leaveRoom: () => Promise<void>;
   ask: (opts: AskOptions) => Promise<boolean>;
@@ -65,6 +66,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PublicState | null>(null);
   const [priv, setPriv] = useState<PrivateInfo | null>(null);
   const [chat, setChat] = useState<ChatMsg[]>([]);
+  const [reactions, setReactions] = useState<CharacterReaction[]>([]);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [pendingAsk, setPendingAsk] = useState<PendingAsk | null>(null);
   const askRef = useRef<PendingAsk | null>(null);
@@ -80,6 +82,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setState(null);
     setPriv(null);
     setChat([]);
+    setReactions([]);
   }, []);
 
   const call = useCallback(async (event: string, payload: object = {}, opts: { silent?: boolean } = {}): Promise<Ack> => {
@@ -135,6 +138,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
     socket.on('chat:history', (h: ChatMsg[]) => setChat(h));
     socket.on('chat:message', (m: ChatMsg) =>
       setChat((c) => (c.some((x) => x.id === m.id) ? c : [...c, m].slice(-200))));
+    socket.on('reaction:show', (r: CharacterReaction) => {
+      setReactions((items) => [...items.filter((item) => item.id !== r.id), r].slice(-8));
+      window.setTimeout(() => setReactions((items) => items.filter((item) => item.id !== r.id)), 2400);
+    });
     socket.on('room:kicked', () => { resetLocal(); notify('The host removed you from the room.', 'error'); });
     socket.on('session:replaced', () => { resetLocal(); notify('This game was opened in another tab.', 'info'); });
 
@@ -155,7 +162,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   // Errors here are shown inline on the home screen, so no toast.
   const createRoom = useCallback(
-    async (name: string, character: number) => enter(await call('room:create', { name, character }, { silent: true })),
+    async (name: string, character: number, isPublic = true) => enter(await call('room:create', { name, character, isPublic }, { silent: true })),
     [call, enter]);
   const joinRoom = useCallback(
     async (code: string, name: string, character: number) =>
@@ -168,9 +175,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const myId = priv?.playerId ?? sessionRef.current?.playerId ?? null;
   const value = useMemo<GameApi>(() => ({
-    connected, restoring, state, priv, chat, myId, notice, dismissNotice, notify, call,
+    connected, restoring, state, priv, chat, reactions, myId, notice, dismissNotice, notify, call,
     createRoom, joinRoom, leaveRoom, ask, pendingAsk, answerAsk,
-  }), [connected, restoring, state, priv, chat, myId, notice, dismissNotice, notify, call, createRoom, joinRoom, leaveRoom, ask, pendingAsk, answerAsk]);
+  }), [connected, restoring, state, priv, chat, reactions, myId, notice, dismissNotice, notify, call, createRoom, joinRoom, leaveRoom, ask, pendingAsk, answerAsk]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

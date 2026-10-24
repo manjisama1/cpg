@@ -87,8 +87,8 @@ export function Chat({ messages, players, myId, onSend, disabled, disabledText }
         )}
       </div>
       {unread > 0 && (
-        <button className="chat-unread" onClick={jump}>
-          <ArrowDown size={16} aria-hidden="true" /> {unread} new
+        <button className="chat-unread" onClick={jump} aria-label={`${unread} new messages. Jump to latest`}>
+          <ArrowDown size={16} aria-hidden="true" /> {unread} new {unread === 1 ? 'message' : 'messages'}
         </button>
       )}
       <div className="chat-compose">

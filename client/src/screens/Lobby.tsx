@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Copy, Crown, LogOut, Minus, Play, Plus, Share2, WifiOff, X } from 'lucide-react';
+import { Check, Copy, Crown, LogOut, Minus, Play, Plus, Settings as SettingsIcon, Share2, WifiOff, X } from 'lucide-react';
 import { useGame } from '../game';
 import { Avatar } from '../components/Avatar';
 import { Chat } from '../components/Chat';
@@ -89,6 +89,7 @@ export default function Lobby() {
   const everyoneHere = s.players.length === 4 && s.players.every((p) => p.connected);
   const allReady = everyoneHere && s.players.every((p) => p.ready);
   const [starting, setStarting] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const hint = s.players.length < 4
     ? `Waiting for ${4 - s.players.length} more player${4 - s.players.length > 1 ? 's' : ''}…`
@@ -124,10 +125,12 @@ export default function Lobby() {
           <div>
             <span className="eyebrow">Room code</span>
             <div className="room-code" aria-label={`Room code ${s.code.split('').join(' ')}`}>{s.code}</div>
+            <span className="room-visibility">{s.isPublic ? 'Public room' : 'Private room'}</span>
           </div>
           <div className="code-actions">
             <button className="btn btn-sky" onClick={copy}><Copy size={18} aria-hidden="true" /> Copy</button>
             <button className="btn btn-mint" onClick={share}><Share2 size={18} aria-hidden="true" /> Share</button>
+            <button className="btn btn-ghost" onClick={() => void g.leaveRoom()}><LogOut size={18} aria-hidden="true" /> Leave</button>
           </div>
         </section>
 
@@ -154,7 +157,18 @@ export default function Lobby() {
           </div>
         </section>
 
-        <section className="card settings">
+      </div>
+
+      <aside className="lobby-chat">
+        <Chat messages={g.chat} players={s.players} myId={g.myId}
+          onSend={async (text) => (await g.call('chat:send', { text })).ok} />
+      </aside>
+
+      <section className="lobby-settings-area">
+        <button className="btn btn-ghost settings-toggle" aria-expanded={showSettings} aria-controls="lobby-settings" onClick={() => setShowSettings((open) => !open)}>
+          <SettingsIcon size={19} aria-hidden="true" /> Match settings {showSettings ? '−' : '+'}
+        </button>
+        {showSettings && <section id="lobby-settings" className="card settings">
           <h2>Match settings {!isHost && <small>(host controls these)</small>}</h2>
           <Stepper label="Rounds" value={s.settings.rounds} min={1} max={10} disabled={!isHost}
             onChange={(v) => patch({ rounds: v })} />
@@ -163,17 +177,8 @@ export default function Lobby() {
           <Choice label="Reconnect wait" unit="s" options={GRACE} value={s.settings.graceMs / 1000} disabled={!isHost}
             onChange={(v) => patch({ graceMs: v * 1000 })} />
           <p className="hint">The Officer orders the Police to find the <b>Chor</b> or the <b>Daket</b>. Police decision: {s.settings.investigationMs / 1000}s. Officer fallback: {s.settings.fallbackMs / 1000}s.</p>
-        </section>
-
-        <button className="btn btn-ghost leave" onClick={() => void g.leaveRoom()}>
-          <LogOut size={18} aria-hidden="true" /> Leave room
-        </button>
-      </div>
-
-      <aside className="lobby-chat">
-        <Chat messages={g.chat} players={s.players} myId={g.myId}
-          onSend={async (text) => (await g.call('chat:send', { text })).ok} />
-      </aside>
+        </section>}
+      </section>
     </main>
   );
 }

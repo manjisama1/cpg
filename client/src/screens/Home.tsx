@@ -1,10 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { DoorOpen, PlusCircle, TriangleAlert } from 'lucide-react';
+import { DoorOpen, PlusCircle, RefreshCw, Server, TriangleAlert } from 'lucide-react';
 import { useGame } from '../game';
-import { Avatar } from '../components/Avatar';
+import { RoleAvatar, ROLE_INFO } from '../components/RoleArt';
 import { CharacterPicker } from '../components/CharacterPicker';
 import { CHARACTER_COUNT, characterName } from '../characters';
-import type { RoomPeek } from '../types';
+import type { PublicRoom, RoomPeek } from '../types';
 
 const cleanCode = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
 const CODE_LENGTH = 5;
@@ -27,7 +27,32 @@ export default function Home() {
   const [peekError, setPeekError] = useState<string | null>(null);
   const [peekTick, setPeekTick] = useState(0); // bump to look at the room again
   const [switched, setSwitched] = useState<string | null>(null);
+  const [isPublic, setIsPublic] = useState(true);
+  const [publicRooms, setPublicRooms] = useState<PublicRoom[]>([]);
+  const [loadingRooms, setLoadingRooms] = useState(false);
+  const [roomsError, setRoomsError] = useState(false);
   const nameOk = name.trim().length > 0;
+
+  const refreshRooms = async () => {
+    setLoadingRooms(true);
+    setRoomsError(false);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SERVER_URL || ''}/api/rooms`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Room list unavailable');
+      const body = await response.json();
+      if (!Array.isArray(body.rooms)) throw new Error('Invalid room list');
+      setPublicRooms(body.rooms);
+    } catch {
+      setRoomsError(true);
+    } finally {
+      setLoadingRooms(false);
+    }
+  };
+  useEffect(() => {
+    void refreshRooms();
+    const timer = window.setInterval(() => void refreshRooms(), 8000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // While joining, look at the room so taken characters and names show up before the player hits Join.
   useEffect(() => {
@@ -89,10 +114,14 @@ export default function Home() {
           <span className="logo-a">CHOR</span>
           <span className="logo-b">POLICE</span>
         </h1>
-        <p className="tagline">Four players. Four roles. One sneaky thief.</p>
-        <div className="logo-crew" aria-hidden="true">
-          {[0, 1, 2, 3].map((i) => <Avatar key={i} character={i} size={72} />)}
-        </div>
+        <ul className="role-crew" aria-label="The four roles">
+          {(['officer', 'police', 'chor', 'daket'] as const).map((role) => (
+            <li key={role} className={`role-crew-card role-crew-${role}`}>
+              <RoleAvatar role={role} size={60} />
+              <span>{ROLE_INFO[role].name}</span>
+            </li>
+          ))}
+        </ul>
       </header>
 
       <section className="card home-card">
@@ -111,12 +140,26 @@ export default function Home() {
           <div className="home-actions">
             {problem && <GameAlert text={problem} />}
             <button className="btn btn-primary btn-big" disabled={!nameOk || busy}
-              aria-busy={busy} onClick={() => void run(() => g.createRoom(name.trim(), character))}>
+              aria-busy={busy} onClick={() => void run(() => g.createRoom(name.trim(), character, isPublic))}>
               <PlusCircle aria-hidden="true" /> Create Room
             </button>
+            <label className={`public-toggle${isPublic ? ' is-public' : ''}`}>
+              <span className="public-switch"><input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} /><i aria-hidden="true" /></span>
+              <span className="public-toggle-copy"><b>{isPublic ? 'Public room' : 'Private room'}</b></span>
+            </label>
             <button className="btn btn-sky btn-big" disabled={!nameOk || busy} onClick={() => { setError(null); setMode('join'); }}>
               <DoorOpen aria-hidden="true" /> Join Room
             </button>
+            <section className="public-rooms" aria-label="Public rooms">
+              <div className="public-rooms-head"><h2><Server size={20} /> Public rooms</h2>
+                <button className="btn btn-ghost btn-icon" onClick={() => void refreshRooms()} aria-label="Refresh public rooms" disabled={loadingRooms}><RefreshCw size={18} /></button></div>
+              {publicRooms.length ? <ul>{publicRooms.map((room) => <li className="public-room-row" key={room.code}>
+                <div className="public-room-info"><b>{room.hostName}'s room</b><span><span className="room-code-pill">{room.code}</span><span className="room-count">{room.players}/{room.capacity} players</span></span></div>
+                <button className="btn btn-mint" disabled={!nameOk || busy} onClick={() => { setCode(room.code); void run(() => g.joinRoom(room.code, name.trim(), character)); }}><DoorOpen size={17} aria-hidden="true" /> Join</button>
+              </li>)}</ul> : <p className={`hint rooms-empty${roomsError ? ' rooms-error' : ''}`} role={roomsError ? 'alert' : 'status'}>
+                {loadingRooms ? 'Finding rooms…' : roomsError ? 'Room list unavailable. Tap refresh to try again.' : 'No open public rooms right now.'}
+              </p>}
+            </section>
             {!nameOk && <p className="hint">Pick a name to get started.</p>}
           </div>
         ) : (

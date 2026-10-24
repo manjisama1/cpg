@@ -55,6 +55,7 @@ export interface FinalRow {
 }
 export interface PublicState {
   code: string;
+  isPublic: boolean;
   state: 'lobby' | 'playing' | 'complete' | 'aborted';
   hostId: string;
   settings: Settings;
@@ -79,4 +80,19 @@ export interface ChatMsg {
   name: string;
   text: string;
   ts: number;
+}
+export interface CharacterReaction {
+  id: string;
+  playerId: string;
+  name: string;
+  character: number;
+  ts: number;
+}
+export interface PublicRoom {
+  code: string;
+  isPublic: boolean;
+  hostName: string;
+  players: number;
+  capacity: number;
+  createdAt: number;
 }

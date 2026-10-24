@@ -1,10 +1,8 @@
 import { Crown, LogOut, RotateCcw, WifiOff } from 'lucide-react';
 import { useGame } from '../game';
 import { Chat } from '../components/Chat';
-import { Confetti } from '../components/Confetti';
 import { RoleBadge } from '../components/RoleArt';
 import { signed } from '../components/AnimatedNumber';
-import { useReducedMotion } from '../prefs';
 import { sfx } from '../sound';
 import { useEffect } from 'react';
 import '../match.css';
@@ -12,7 +10,6 @@ import '../match.css';
 export function FinalScreen() {
   const g = useGame();
   const s = g.state!;
-  const reduced = useReducedMotion();
   const rows = s.final ?? [];
   const winners = rows.filter((r) => r.rank === 1);
   const isHost = s.hostId === g.myId;
@@ -22,7 +19,6 @@ export function FinalScreen() {
 
   return (
     <main className="final">
-      {!reduced && <Confetti />}
       <header className="final-head">
         <h1 className="final-title">Match over!</h1>
         <p className="final-winner" role="status">

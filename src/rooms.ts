@@ -76,6 +76,7 @@ export type MatchState = 'lobby' | 'playing' | 'complete' | 'aborted';
 
 export interface Room {
   code: string;
+  isPublic: boolean;
   hostId: string;
   players: Player[];
   settings: MatchSettings;
@@ -90,6 +91,7 @@ export interface Room {
   createdAt: number;
   lastActive: number;
   rate: Map<string, number[]>;
+  reactionAt: Map<string, number>;
   // broadcast bookkeeping
   dirty: boolean;
   sentPhase: string | null;
@@ -197,22 +199,46 @@ export class RoomManager {
     return this.pushChat(room, 'chat', player, clean, now);
   }
 
+  addReaction(code: string, playerId: string, now: number) {
+    const { room, player } = this.ctx(code, playerId, now);
+    if (room.state !== 'playing') fail('wrong_state', 'Reactions are available during a match');
+    const last = room.reactionAt.get(playerId);
+    if (last !== undefined && now - last < 900) fail('rate_limited', 'Wait a moment before reacting again');
+    room.reactionAt.set(playerId, now);
+    return { id: randomBytes(6).toString('hex'), playerId, name: player.name, character: player.character, ts: now };
+  }
+
   // ----- room lifecycle -----
-  createRoom(name: string, socketId: string, now: number, character = 0) {
+  createRoom(name: string, socketId: string, now: number, character = 0, isPublic = true) {
     if (this.rooms.size >= this.maxRooms) fail('server_busy', 'Server is full, try again later');
     let code = makeCode();
     while (this.rooms.has(code)) code = makeCode();
     const player = newPlayer(sanitizeName(name), validateCharacter(character));
     const room: Room = {
-      code, hostId: player.id, players: [player],
+      code, hostId: player.id, players: [player], isPublic,
       settings: { ...DEFAULT_MATCH_SETTINGS }, state: 'lobby', roundNo: 0, round: null,
       scoreboard: new Scoreboard([]), rounds: [], chat: [], chatSeq: 0, pausedAt: null,
-      createdAt: now, lastActive: now, rate: new Map(),
+      createdAt: now, lastActive: now, rate: new Map(), reactionAt: new Map(),
       dirty: true, sentPhase: null, sentState: null, sentPaused: false, sentChatId: 0, sentRoundKey: '',
     };
     this.rooms.set(code, room);
     this.attach(room, player, socketId, now);
     return { room, player };
+  }
+
+  /** Public lobby directory. Only rooms accepting new players are discoverable. */
+  publicRooms() {
+    return [...this.rooms.values()]
+      .filter((room) => room.isPublic && room.state === 'lobby' && room.players.length < PLAYERS_PER_ROOM)
+      .map((room) => ({
+        code: room.code,
+        isPublic: room.isPublic,
+        hostName: room.players.find((p) => p.id === room.hostId)?.name ?? 'Host',
+        players: room.players.length,
+        capacity: PLAYERS_PER_ROOM,
+        createdAt: room.createdAt,
+      }))
+      .sort((a, b) => a.createdAt - b.createdAt);
   }
 
   /** What a would-be joiner may know before joining: which looks and names are already taken. */
@@ -527,6 +553,7 @@ export class RoomManager {
   publicView(room: Room, now: number) {
     return {
       code: room.code,
+      isPublic: room.isPublic,
       state: room.state,
       hostId: room.hostId,
       settings: room.settings,

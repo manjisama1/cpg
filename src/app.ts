@@ -21,7 +21,7 @@ const character = z.number().int().min(0).max(CHARACTER_COUNT - 1);
 const empty = z.object({}).strict();
 
 const schemas = {
-  create: z.object({ name, character: character.optional() }).strict(),
+  create: z.object({ name, character: character.optional(), isPublic: z.boolean().optional() }).strict(),
   join: z.object({ code, name: name.optional(), character: character.optional(), token: token.optional() }).strict(),
   peek: z.object({ code }).strict(),
   ready: z.object({ ready: z.boolean() }).strict(),
@@ -63,6 +63,14 @@ export function createGameServer(opts: AppOptions = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.get('/health', (_req, res) => res.json({ ok: true, rooms: manager.rooms.size }));
+  app.get('/api/rooms', (req, res) => {
+    const origin = req.get('origin');
+    if (origin && opts.corsOrigin?.length) {
+      if (!opts.corsOrigin.includes(origin)) return res.sendStatus(403);
+      res.set('Access-Control-Allow-Origin', origin).vary('Origin');
+    } else if (origin) res.set('Access-Control-Allow-Origin', '*');
+    return res.set('Cache-Control', 'no-store').json({ rooms: manager.publicRooms() });
+  });
   const dist = opts.clientDist ?? process.env.CLIENT_DIST;
   if (dist && existsSync(dist)) {
     app.use(express.static(dist));
@@ -148,7 +156,7 @@ export function createGameServer(opts: AppOptions = {}) {
     bind('room:create', schemas.create, (d) => {
       ipOk();
       notInRoom();
-      const { room, player } = manager.createRoom(d.name, socket.id, now(), d.character);
+      const { room, player } = manager.createRoom(d.name, socket.id, now(), d.character, d.isPublic ?? true);
       enter(socket, room, player.id);
       return { code: room.code, playerId: player.id, token: player.token };
     });
@@ -212,6 +220,11 @@ export function createGameServer(opts: AppOptions = {}) {
     bind('chat:send', schemas.chat, (d) => {
       const s = session(socket);
       manager.addChat(s.code, s.playerId, d.text, now());
+    });
+    bind('reaction:send', empty, () => {
+      const s = session(socket);
+      const reaction = manager.addReaction(s.code, s.playerId, now());
+      io.to(s.code).emit('reaction:show', reaction);
     });
     bind('investigation:submit', schemas.target, (d) => {
       const s = session(socket);
